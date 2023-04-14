@@ -160,6 +160,31 @@ Resources:
           Value:
             Fn::Sub: ${ProjectName}-sg-web
 
+  EC2InstanceExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName:
+        Fn::Sub: ${ProjectName}-EC2InstanceExecutionPolicy
+      Description: Execution policy for EC2 instances
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ArtifactsBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetBucketAcl
+              - s3:GetBucketLocation
+            Resource:
+              - Fn::Sub: arn:${AWS::Partition}:s3:::${ProjectName}-artifacts
+          - Sid: ArtifactsBucketObjectsAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:PutObject
+            Resource:
+              - Fn::Sub: arn:${AWS::Partition}:s3:::${ProjectName}-artifacts/*
+
   EC2InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -169,6 +194,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - Ref: EC2InstanceExecutionPolicy
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
