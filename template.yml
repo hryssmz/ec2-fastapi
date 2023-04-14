@@ -433,7 +433,96 @@ Resources:
           TargetGroupArn:
             Ref: ALBTargetGroup
 
+  # CloudFront
+  CachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name:
+          Fn::Sub: ${ProjectName}-CachePolicy
+        Comment:
+          Fn::Sub: ${ProjectName} cache policy
+        DefaultTTL: 86400
+        MinTTL: 1
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  NoCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name:
+          Fn::Sub: ${ProjectName}-NoCachePolicy
+        Comment:
+          Fn::Sub: ${ProjectName} no cache policy
+        DefaultTTL: 0
+        MinTTL: 0
+        MaxTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: false
+          EnableAcceptEncodingGzip: false
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: CloudFront distribution
+        Enabled: true
+        Origins:
+          - Id:
+              Fn::GetAtt: ALB.DNSName
+            DomainName:
+              Fn::GetAtt: ALB.DNSName
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          CachePolicyId:
+            Ref: NoCachePolicy
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          TargetOriginId:
+            Fn::GetAtt: ALB.DNSName
+          ViewerProtocolPolicy: allow-all
+        CacheBehaviors:
+          - PathPattern: /*
+            CachePolicyId:
+              Ref: CachePolicy
+            AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            TargetOriginId:
+              Fn::GetAtt: ALB.DNSName
+            ViewerProtocolPolicy: allow-all
+
 Outputs:
   ALBDNSName:
     Value:
       Fn::GetAtt: ALB.DNSName
+
+  DistributionDomain:
+    Value:
+      Fn::GetAtt: Distribution.DomainName
