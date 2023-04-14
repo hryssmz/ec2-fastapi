@@ -70,6 +70,50 @@ Resources:
           Value:
             Ref: ProjectName
 
+  # CodeDeploy
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: ${ProjectName}-CodeDeployServiceRole
+      Description: Service role for AWS CodeDeploy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName:
+        Ref: ProjectName
+      ComputePlatform: Server
+
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName:
+        Ref: CodeDeployApplication
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      DeploymentGroupName:
+        Fn::Sub: ${ProjectName}-DeploymentGroup
+      DeploymentStyle:
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+        DeploymentType: IN_PLACE
+      Ec2TagFilters:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
+          Type: KEY_AND_VALUE
+      ServiceRoleArn:
+        Fn::GetAtt: CodeDeployServiceRole.Arn
+
   # CodePipeline
   CodePipelineExecutionPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -233,6 +277,22 @@ Resources:
               InputArtifacts:
                 - Name: SourceCode
               RunOrder: 1
+
+            - Name: CodeDeploy
+              Namespace: CodeDeploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              Configuration:
+                ApplicationName:
+                  Ref: CodeDeployApplication
+                DeploymentGroupName:
+                  Ref: DeploymentGroup
+              InputArtifacts:
+                - Name: SourceCode
+              RunOrder: 2
 
       Tags:
         - Key: ProjectName

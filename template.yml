@@ -31,9 +31,12 @@ Resources:
     Properties:
       CidrBlock: 172.20.0.0/16
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-vpc
+            Fn::Sub: ${ProjectName}-vpc
 
   Subnet:
     Type: AWS::EC2::Subnet
@@ -47,9 +50,12 @@ Resources:
           - Fn::GetAZs: ""
       MapPublicIpOnLaunch: true
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-sn
+            Fn::Sub: ${ProjectName}-sn
 
   Subnet2:
     Type: AWS::EC2::Subnet
@@ -63,9 +69,12 @@ Resources:
           - Fn::GetAZs: ""
       MapPublicIpOnLaunch: true
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-sn2
+            Fn::Sub: ${ProjectName}-sn2
 
   RouteTable:
     Type: AWS::EC2::RouteTable
@@ -73,9 +82,12 @@ Resources:
       VpcId:
         Ref: VPC
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-rtb
+            Fn::Sub: ${ProjectName}-rtb
 
   SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -97,9 +109,12 @@ Resources:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-igw
+            Fn::Sub: ${ProjectName}-igw
 
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -124,7 +139,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName:
-        Fn::Sub: ${AWS::StackName}-WebSecurityGroup
+        Fn::Sub: ${ProjectName}-WebSecurityGroup
       GroupDescription: Web security group
       VpcId:
         Ref: VPC
@@ -138,15 +153,18 @@ Resources:
           ToPort: 8000
           CidrIp: 0.0.0.0/0
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-sg-web
+            Fn::Sub: ${ProjectName}-sg-web
 
   EC2InstanceRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName:
-        Fn::Sub: ${AWS::StackName}-EC2InstanceRole
+        Fn::Sub: ${ProjectName}-EC2InstanceRole
       Description: Service role for EC2 instance
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
@@ -158,28 +176,71 @@ Resources:
               Service: ec2.amazonaws.com
             Action:
               - sts:AssumeRole
+      Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
 
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       InstanceProfileName:
-        Fn::Sub: ${AWS::StackName}-EC2InstanceProfile
+        Fn::Sub: ${ProjectName}-EC2InstanceProfile
       Roles:
         - Ref: EC2InstanceRole
+
+  CodeDeployAgentAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: InstallCodeDeployAgent
+      Name: AWS-ConfigureAWSPackage
+      Parameters:
+        action:
+          - Install
+        name:
+          - AWSCodeDeployAgent
+      ScheduleExpression: cron(0 2 ? * SUN *)
+      Targets:
+        - Key: tag:ProjectName
+          Values:
+            - Ref: ProjectName
 
   # EC2 Auto Scaling
   AsgLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            /etc/systemd/system/myapp.service:
+              content: |
+                [Unit]
+                Description=MyApp Service
+                After=network.target
+
+                [Service]
+                Type=simple
+                User=ec2-user
+                WorkingDirectory=/home/ec2-user/myapp
+                ExecStart=python -m uvicorn main:app --host 0.0.0.0 --port 8000
+                Restart=always
+                RestartSec=3
+
+                [Install]
+                WantedBy=multi-user.target
     Properties:
       LaunchTemplateName:
-        Fn::Sub: ${AWS::StackName}-AsgLaunchTemplate
+        Fn::Sub: ${ProjectName}-AsgLaunchTemplate
       VersionDescription: Launch template for auto scaling group
       TagSpecifications:
         - ResourceType: launch-template
           Tags:
+            - Key: ProjectName
+              Value:
+                Ref: ProjectName
             - Key: Name
               Value:
-                Fn::Sub: ${AWS::StackName}-lt-asg
+                Fn::Sub: ${ProjectName}-lt-asg
       LaunchTemplateData:
         ImageId:
           Fn::FindInMap:
@@ -201,39 +262,19 @@ Resources:
         TagSpecifications:
           - ResourceType: instance
             Tags:
+              - Key: ProjectName
+                Value:
+                  Ref: ProjectName
               - Key: Name
                 Value:
-                  Fn::Sub: ${AWS::StackName}-i-al2013
+                  Fn::Sub: ${ProjectName}-i-al2013
         UserData:
           Fn::Base64:
             Fn::Sub: |
               #!/bin/sh
-              dnf update -y
-              dnf install -y httpd
-              echo "<h1>Hello World</h1>" > /var/www/html/index.html
-              TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
-              INSTANCE_ID=`curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id`
-              echo "<p>Instance ID: $INSTANCE_ID</p>" >> /var/www/html/index.html
-              systemctl start httpd
-              systemctl enable httpd
-              usermod -a -G apache ec2-user
-              chown -R ec2-user:apache /var/www
-              chmod 2775 /var/www
-              find /var/www -type d -exec chmod 2775 {} \;
-              find /var/www -type f -exec chmod 0664 {} \;
-
-              MAX_RETRY=20
-              RETRY_INTERVAL=5
-              HEALTH_CHECK_URL="http://localhost"
-              for TRIED_COUNT in `seq $MAX_RETRY`; do
-                  curl $HEALTH_CHECK_URL
-                  if [ $? -eq "0" ]; then
-                      /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --region ${AWS::Region} --resource AutoScalingGroup
-                      break
-                  else
-                      sleep $RETRY_INTERVAL
-                  fi
-              done
+              dnf install -y python python3-pip
+              /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource AsgLaunchTemplate --region ${AWS::Region}
+              /opt/aws/bin/cfn-signal -e 0 --stack ${ProjectName} --region ${AWS::Region} --resource AutoScalingGroup
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -258,7 +299,7 @@ Resources:
         WaitOnResourceSignals: true
     Properties:
       AutoScalingGroupName:
-        Fn::Sub: ${AWS::StackName}-AutoScalingGroup
+        Fn::Sub: ${ProjectName}-AutoScalingGroup
       MinSize: 0
       MaxSize: 5
       DesiredCapacity:
@@ -278,9 +319,13 @@ Resources:
       TargetGroupARNs:
         - Ref: ALBTargetGroup
       Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
+          PropagateAtLaunch: false
         - Key: Name
           Value:
-            Fn::Sub: ${AWS::StackName}-asg
+            Fn::Sub: ${ProjectName}-asg
           PropagateAtLaunch: false
 
   ScalingPolicy:
@@ -299,7 +344,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name:
-        Fn::Sub: ${AWS::StackName}-ALB
+        Fn::Sub: ${ProjectName}-ALB
       Type: application
       IpAddressType: ipv4
       Scheme: internet-facing
@@ -308,12 +353,16 @@ Resources:
       Subnets:
         - Ref: Subnet
         - Ref: Subnet2
+      Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
 
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name:
-        Fn::Sub: ${AWS::StackName}-ALBTargetGroup
+        Fn::Sub: ${ProjectName}-ALBTargetGroup
       TargetType: instance
       IpAddressType: ipv4
       Protocol: HTTP
@@ -332,6 +381,10 @@ Resources:
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 10
+      Tags:
+        - Key: ProjectName
+          Value:
+            Ref: ProjectName
 
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
