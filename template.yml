@@ -7,6 +7,14 @@ Parameters:
     Description: Project name
     Default: ec2-fastapi
 
+  DesiredCapacity:
+    Type: Number
+    Description: DesiredCapacity for auto scaling group
+    Default: 1
+    MinValue: 0
+    MaxValue: 5
+    ConstraintDescription: must be an integer between 0 and 5
+
 Mappings:
   RegionProfile2AMI:
     ap-northeast-1:
