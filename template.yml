@@ -455,27 +455,6 @@ Resources:
           QueryStringsConfig:
             QueryStringBehavior: none
 
-  NoCachePolicy:
-    Type: AWS::CloudFront::CachePolicy
-    Properties:
-      CachePolicyConfig:
-        Name:
-          Fn::Sub: ${ProjectName}-NoCachePolicy
-        Comment:
-          Fn::Sub: ${ProjectName} no cache policy
-        DefaultTTL: 0
-        MinTTL: 0
-        MaxTTL: 0
-        ParametersInCacheKeyAndForwardedToOrigin:
-          EnableAcceptEncodingBrotli: false
-          EnableAcceptEncodingGzip: false
-          CookiesConfig:
-            CookieBehavior: none
-          HeadersConfig:
-            HeaderBehavior: none
-          QueryStringsConfig:
-            QueryStringBehavior: none
-
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -492,7 +471,7 @@ Resources:
               OriginProtocolPolicy: http-only
         DefaultCacheBehavior:
           CachePolicyId:
-            Ref: NoCachePolicy
+            Ref: CachePolicy
           AllowedMethods:
             - GET
             - HEAD
@@ -503,20 +482,6 @@ Resources:
           TargetOriginId:
             Fn::GetAtt: ALB.DNSName
           ViewerProtocolPolicy: allow-all
-        CacheBehaviors:
-          - PathPattern: /*
-            CachePolicyId:
-              Ref: CachePolicy
-            AllowedMethods:
-              - GET
-              - HEAD
-            CachedMethods:
-              - GET
-              - HEAD
-            Compress: true
-            TargetOriginId:
-              Fn::GetAtt: ALB.DNSName
-            ViewerProtocolPolicy: allow-all
 
 Outputs:
   ALBDNSName:

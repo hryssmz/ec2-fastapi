@@ -181,7 +181,10 @@ Resources:
               - codedeploy:GetDeployment
               - codedeploy:GetDeploymentConfig
               - codedeploy:RegisterApplicationRevision
-            Resource: "*"
+            Resource:
+              - Fn::Sub: arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentgroup:${ProjectName}*/${ProjectName}*
+              - Fn::Sub: arn:${AWS::Partition}:deploymentconfig:*
+              - Fn::Sub: arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${ProjectName}*
 
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
