@@ -10,7 +10,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root() -> JSONResponse:
-    res_body = {"message": "Hello World!"}
+    res_body = {"message": "Hello World"}
     response = JSONResponse(content=res_body, status_code=status.HTTP_200_OK)
     return response
 
