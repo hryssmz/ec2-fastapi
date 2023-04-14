@@ -167,6 +167,7 @@ Resources:
         Fn::Sub: ${ProjectName}-EC2InstanceRole
       Description: Service role for EC2 instance
       ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
