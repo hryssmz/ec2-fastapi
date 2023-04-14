@@ -183,7 +183,7 @@ Resources:
               - codedeploy:RegisterApplicationRevision
             Resource:
               - Fn::Sub: arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentgroup:${ProjectName}*/${ProjectName}*
-              - Fn::Sub: arn:${AWS::Partition}:deploymentconfig:*
+              - Fn::Sub: arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentconfig:CodeDeployDefault.*
               - Fn::Sub: arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${ProjectName}*
 
   CodePipelineServiceRole:
