@@ -249,7 +249,7 @@ Resources:
                 Type=simple
                 User=root
                 WorkingDirectory=/root/myapp
-                ExecStart=python -m uvicorn main:app --host 0.0.0.0 --port 8000
+                ExecStart=uvicorn main:app --host 0.0.0.0 --port 8000
                 Restart=always
                 RestartSec=3
 
@@ -432,3 +432,8 @@ Resources:
         - Type: forward
           TargetGroupArn:
             Ref: ALBTargetGroup
+
+Outputs:
+  ALBDNSName:
+    Value:
+      Fn::GetAtt: ALB.DNSName
